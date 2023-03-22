@@ -23,4 +23,3 @@ This is more for the folk who want to know the technicalities of how this (theor
 - ProfileService does not account for players losing connections and rejoining, by caching the data-- if the player is disconnected and quickly reconnects-- chances are that the data will still be in the cache, and the server does not have to waste network fetching the data again.
    - Simplified: Player loses connection, player rejoins, less time is used fetching data.
 
-
