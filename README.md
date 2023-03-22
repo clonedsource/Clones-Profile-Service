@@ -10,8 +10,8 @@ ProfileService is an excellent module with excellent documentation, however I fo
 2. Require the package in a script with the RunContext as Legacy or Server.
   - ```local ProfileService = require(ServerScriptService.ProfileService) ```
 
-## Documentation
-Hello, I am current still working on documentation, however I will link it here when I am finished.
+## [Documentation] (https://github.com/clonedsource/Clones-Profile-Service/wiki)
+[here].
 
 ## Technicals
 This is more for the folk who want to know the technicalities of how this (theoretically) works.
