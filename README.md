@@ -17,7 +17,10 @@ Documentation is in the works.
 This is more for the folk who want to know the technicalities of how this (theoretically) works.
 > ... and support for features that by default, ProfileService simply does not have.
 - ProfileService does not by default cache the players data and dump it into datastores after a certain duration of time. My module script does this, and empties it after 120 seconds, something I will probably end up tweaking and adding settings for later on.
+   - Simplified: ensures the safety of player data saving even in cases of data not saving successfully. (loops through the cache every 120 seconds.)
 - ProfileService does not by default backup the players data. I have implemented this through the cache system, as updating the players backup is not economically efficient for individuals leaving, as it wastes network and cpu cycles. when the cache is emptied it also saves to a backup if possible.
+   - Simplified: Player has a backup no matter what.
 - ProfileService does not account for players losing connections and rejoining, by caching the data-- if the player is disconnected and quickly reconnects-- chances are that the data will still be in the cache, and the server does not have to waste network fetching the data again.
+   - Simplified: Player loses connection, player rejoins, less time is used fetching data.
 
 
