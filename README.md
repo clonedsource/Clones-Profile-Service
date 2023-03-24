@@ -12,7 +12,7 @@ ProfileService is an excellent module with excellent documentation, however I fo
   - ```local ProfileService = require(ServerScriptService.ProfileService) ```
 
 ## Documentation
-[Documentation] (https://github.com/clonedsource/Clones-Profile-Service/wiki)
+[Documentation](https://github.com/clonedsource/Clones-Profile-Service/wiki)
 
 ## Technicals
 This is more for the folk who want to know the technicalities of how this (theoretically) works.
