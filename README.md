@@ -22,4 +22,5 @@ This is more for the folk who want to know the technicalities of how this (theor
    - Simplified: Player has a backup no matter what.
 - ProfileService does not account for players losing connections and rejoining, by caching the data-- if the player is disconnected and quickly reconnects-- chances are that the data will still be in the cache, and the server does not have to waste network fetching the data again.
    - Simplified: Player loses connection, player rejoins, less time is used fetching data.
-
+- ProfileService will merge data when MergeData is set to true when Initializing the module upon server start up. This will help streamline actually merging data from an old store to a new store-- this will only happen if there is no data in the new store!
+   - Simplified: Streamlined data merging.
