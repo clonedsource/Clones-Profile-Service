@@ -95,7 +95,7 @@ local function AttemptCache()
 					end
 				end)()
 				coroutine.wrap(function()
-					for _ = 0, 2 do -- Attempts to update backup Data.
+					for _ = 0, 2 do -- Attempts to update metadata.
 						local success = pcall(UpdateAsync, MetadataStore, UserId, ProfileData.Metadata)
 						if settings.DebugMode then
 							if not success then
