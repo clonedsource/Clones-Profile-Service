@@ -6,7 +6,7 @@ ProfileService is an excellent module with excellent documentation, however I fo
 ## Instructions
 ### What ways can I install (use) this?
 * Option 1. Get the model [here](https://www.roblox.com/library/12877376020/ProfileService) and paste the ProfileService script wherever you want in ServerScriptService. 
-* Option 2. Take the contents of the ProfileService.lua [file](...) in the repo and paste it into an empty module script.
+* Option 2. Take the contents of the ProfileService.lua [file](https://raw.githubusercontent.com/clonedsource/Clones-Profile-Service/main/ProfileService.lua) in the repo and paste it into an empty module script.
 1. Install it using one of the methods shown above.
 2. Require the module in a script with the RunContext as Legacy or Server.
   - ```local ProfileService = require(ServerScriptService.ProfileService) ```
