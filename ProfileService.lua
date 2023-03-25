@@ -21,7 +21,7 @@ local settings = {
 	StoreName = "";
 	Version = 0;
 	DebugMode = game:GetService("RunService"):IsStudio();
-	MergeOld = false;
+	MergeOld = true;
 }
 
 local TemplateMetadata = {
@@ -34,6 +34,8 @@ local TemplateMetadata = {
 	LastPlaceId = game.PlaceId;
 	Purged = false;
 }
+
+local ProfileBinds = {}
 --//End of "Arrays"//--
 
 
@@ -191,7 +193,7 @@ function Service:New(
 			Corruption = nil;
 
 		};
-		Metadata = {};
+		Metadata = table.clone(TemplateMetadata);
 	}
 	
 	task.spawn(function() -- Metadata is pretty important ngl, but I want the profile to return fast, so I'll just task it.
@@ -218,32 +220,49 @@ function Service:New(
 		Profile.Metadata.SessionCount += 1
 		
 	end)
-	
-	
+	ProfileBinds[UserId] = {}
 	
 	
 	local ListenToRelease = Instance.new("BindableEvent")
+	ProfileBinds[UserId].ListenToRelease = ListenToRelease
 	Profile.Signals.ListenToRelease = ListenToRelease.Event
+	
+	local ListenToDebug = Instance.new("BindableEvent")
+	ProfileBinds[UserId].ListenToDebug = ListenToDebug
+	Profile.Signals.ListenToDebug = ListenToDebug.Event
+	
+	local ListenToPurge = Instance.new("BindableEvent")
+	ProfileBinds[UserId].ListenToPurge = ListenToPurge
+	Profile.Signals.ListenToPurge = ListenToPurge.Event
+	
+	local Loaded = Instance.new("BindableEvent")
+	ProfileBinds[UserId].Loaded = Loaded
+	Profile.Signals.Loaded = Loaded.Event
+
+	local Corruption = Instance.new("BindableEvent")
+	ProfileBinds[UserId].Corruption = Corruption
+	Profile.Signals.Corruption = Corruption.Event
+
+	
 
 	function Profile:Release()
-		if settings.DebugMode then
-			print("Profile of " .. Player.Name .. " released!")
-			
-		end
-		
 		Profile.Metadata.LastUnloaded = tick()
 		Profile.Metadata.LastServer = game.JobId or "StudioServer"
 		Profile.Metadata.LastStoreName = settings.StoreName
 		Profile.Metadata.LastVersion = settings.Version
 		
-		print(Profile.Metadata.LastVersion, settings.Version)
-		print(Profile.Metadata)
+		if settings.DebugMode then
+			print("Profile of " .. Player.Name .. " released!")
+			print(Profile.Metadata.LastVersion, settings.Version)
+			print(Profile.Metadata)
+		end
 		
 		Cache[UserId] = {Data = Profile.Data, Metadata = Profile.Metadata}
 		pcall(UpdateAsync, DataStore, UserId, Profile.Data)
 		
 		ListenToRelease:Fire()
-
+		ProfileBinds[UserId] = nil
+		
 	end
 	Profiles[UserId] = Profile
 
@@ -278,26 +297,107 @@ function Service.ReturnProfile(Player, waitTime)
 	end
 	
 	if settings.DebugMode then
+		if ProfileBinds[Player.UserId] then
+			ProfileBinds[Player.UserId].ListenToDebug:Fire(errorCode, "warn")
+			
+		end
+		
 		warn(errorCode)
 		
 	end
 	
 end
 
+function Service:Purge(
+	Player
+)
+	local typeCheck = table.find({"number", "string"}, type(Player))
+	local UserId = nil
+	if not typeCheck then
+		if Player then
+			UserId = Player.UserId
+			
+		end
+	else
+		if typeCheck == 1 then
+			UserId = Player
+			
+		else
+			UserId = game:GetService("Players"):GetUserIdFromNameAsync(Player)
+		end
+		
+	end
+	
+	local successCount = 0
+	
+	if UserId then
+		local function Remover(...)
+			for _ = 0, 2 do
+				local success = table.pack(pcall(task.spawn, RemoveAsync, ...))
+				if success then
+					successCount += 1
+					coroutine.yield()
+					
+				else
+					if settings.DebugMode then
+						warn("Failed to purge profile!")
+						
+					end
+					
+				end
+				task.wait(1.75^(_+3))
+				
+			end
+			coroutine.yield()
+			
+		end
+		coroutine.wrap(Remover)(DataStore, UserId)
+		coroutine.wrap(Remover)(BackupStore, UserId)
+		if Profiles[UserId] then
+			Profiles[UserId].Metadata.Purged = true
+			pcall(task.spawn, UpdateAsync, MetadataStore, UserId, Reconcile(Profiles[UserId].Metadata, TemplateMetadata))
+			if ProfileBinds[UserId] then
+				ProfileBinds[UserId].ListenToPurge:Fire()
+				
+			end
+			
+		end
+		
+		
+		
+	end
+	return successCount == 2
+	
+end
+
 function Service.LoadData(
 	Player
 )
+	local typeCheck = table.find({"number", "string"}, type(Player))
+	local UserId = nil
+	if not typeCheck then
+		if Player then
+			UserId = Player.UserId
 
-	if Player then
-		local UserId = Player.UserId
+		end
+	else
+		if typeCheck == 1 then
+			UserId = Player
+
+		else
+			UserId = game:GetService("Players"):GetUserIdFromNameAsync(Player)
+			
+		end
+
+	end
+
+	if UserId then
 		local pullSuccess, Data = false, nil
-		local CorruptionEvent, LoadedEvent
 		local Metadata = TemplateMetadata
 		
-		if Profiles[Player.UserId] then
-			pcall(function() CorruptionEvent = Profiles[Player.UserId].Signals.Corruption end)
-			pcall(function() LoadedEvent = Profiles[Player.UserId].Signals.Loaded end)
-			Metadata = Profiles[Player.UserId].Metadata
+		if Profiles[UserId] then
+	
+			Metadata = Profiles[UserId].Metadata
 		end
 
 		if Cache[UserId] ~= nil then -- Attempts to pull from cache
@@ -310,8 +410,12 @@ function Service.LoadData(
 			for _ = 0, 2 do -- Attempts to pull from datastore
 				local success, result = pcall(GetAsync, DataStore, UserId)
 				if not success and settings.DebugMode then
-					print(result)
+					warn(result)
+					if ProfileBinds[UserId] then
+						ProfileBinds[UserId].ListenToDebug:Fire(result, "warn")
 
+					end
+					
 				end
 
 
@@ -326,7 +430,9 @@ function Service.LoadData(
 
 			if not Data then -- Validation of data given a failure in pulling.
 				if settings.DebugMode then
-					print("Failed to pull from main store!")
+					warn("Failed to pull from main store!")
+					ProfileBinds[UserId].ListenToDebug:Fire("Failed to pull from main store!", "warn")
+					
 				end
 
 				local last_pullSuccess = pullSuccess
@@ -353,24 +459,47 @@ function Service.LoadData(
 
 				if last_pullSuccess and pullSuccess and Data ~= nil then
 					warn("Corruption found")
-					pcall(task.spawn, CorruptionEvent)
+					if ProfileBinds[UserId] then
+						ProfileBinds[UserId].Corruption:Fire()
+						if settings.DebugMode then
+							ProfileBinds[UserId].ListenToDebug:Fire("Corruption found", "warn")
+							
+						end
+
+
+					end
+					
 				end
 
 			end
 
 		end
 		
-		if ((Metadata.LastVersion ~= settings.Version or Metadata.LastStoreName ~= settings.StoreName) and Metadata.LastPlaceId == game.PlaceId) and settings.MergeOld and not Data then -- Try merging...
+		if ((Metadata.LastVersion ~= settings.Version or Metadata.LastStoreName ~= settings.StoreName) and Metadata.LastPlaceId == game.PlaceId) and settings.MergeOld ~= false and not Data then -- Try merging...
+			local StoreName = Metadata.LastStoreName .. "+" .. Metadata.LastVersion
+			if type(settings.MergeOld) == "string" then
+				StoreName = settings.MergeOld
+
+			end
+			
 			if settings.DebugMode then
 				print("Attempting to merge data")
+				if ProfileBinds[UserId] then
+					ProfileBinds[UserId].ListenToDebug:Fire("Attempting to merge data", "safe")
+
+				end
 				
 			end
 			
 			for _ = 0, 2 do -- Attempts to pull from old datastore
-				local success, result = pcall(GetAsync, DataStoreService:GetDataStore(Metadata.LastStoreName .. "+" .. Metadata.LastVersion), UserId)
+				local success, result = pcall(GetAsync, DataStoreService:GetDataStore(StoreName), UserId)
 				if not success and settings.DebugMode then
-					print(result)
+					warn(result)
+					if ProfileBinds[UserId] then
+						ProfileBinds[UserId].ListenToDebug:Fire(result, "warn")
 
+					end
+					
 				end
 
 
@@ -385,17 +514,22 @@ function Service.LoadData(
 
 			if not Data then -- Validation of data given a failure in pulling.
 				if settings.DebugMode then
-					print("Failed to pull from main store!")
+					warn("Failed to pull from main store!")
+					if ProfileBinds[UserId] then
+						ProfileBinds[UserId].ListenToDebug:Fire("Failed to pull from main store!", "warn")
+
+					end
+					
 				end
 
 				local last_pullSuccess = pullSuccess
 				pullSuccess = false
 
 				for _ = 0, 2 do -- Attempts to pull from old backup datastore
-					local success, result = pcall(GetAsync, DataStoreService:GetDataStore(Metadata.LastStoreName .. "+" .. Metadata.LastVersion .. "_Backup"), UserId)
+					local success, result = pcall(GetAsync, DataStoreService:GetDataStore(StoreName), UserId)
 					if not success and settings.DebugMode then
-						print(result)
-
+						warn(result)
+						ProfileBinds[UserId].ListenToDebug:Fire(result, "warn")
 					end
 
 					pullSuccess = success
@@ -412,27 +546,35 @@ function Service.LoadData(
 
 				if last_pullSuccess and pullSuccess and Data ~= nil then
 					warn("Corruption found")
-					pcall(task.spawn, CorruptionEvent)
+					if ProfileBinds[UserId] then
+						ProfileBinds[UserId].Corruption:Fire()
+						
+					end
+					
 				end
 
 			end
 
 		end
 		
-		pcall(task.delay, 0, LoadedEvent)
-
 		if Player then
-			return Reconcile(Data, settings.Template)
-
-		else
-			Cache[UserId] = Reconcile(Data, settings.Template)
-			if settings.DebugMode then
-				warn("Player left after data loaded!")
+			if ProfileBinds[UserId] then
+				ProfileBinds[UserId].Loaded:Fire(Reconcile(Data, settings.Template))
 
 			end
 
+		else
+			if settings.DebugMode and not typeCheck then
+				warn("Player left after data loaded!")
+				if ProfileBinds[UserId] then
+					ProfileBinds[UserId].ListenToDebug:Fire("Player left after data loaded!", "warn")
+					
+				end
+
+			end
+			
 		end
-		return nil
+		return Reconcile(Data, settings.Template)
 
 	end
 	return nil
