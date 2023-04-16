@@ -9,8 +9,10 @@ ProfileService is an excellent module with excellent documentation, however I fo
 * Option 2. Take the contents of the ProfileService.lua [file](https://raw.githubusercontent.com/clonedsource/Clones-Profile-Service/main/ProfileService.lua) in the repo and paste it into an empty module script. (click the link, ctrl + A, ctrl + C, ctrl + V inside an empty module script)
 1. Install it using one of the methods shown above.
 2. Require the module in a script with the RunContext as Legacy or Server.
-* Option 3. in the script that requires access to this, do: ``` local ProfileService = require(12877376020) ```
-  - ```local ProfileService = require(ServerScriptService.ProfileService) ```
+   - ```local ProfileService = require(ServerScriptService.ProfileService) ```
+* Option 3. In the script that requires access to the module, do: 
+   - ``` local ProfileService = require(12877376020) ```
+
 
 ## Documentation
 [Documentation](https://github.com/clonedsource/Clones-Profile-Service/wiki)
