@@ -25,24 +25,30 @@ local Profiles = {}
 
 --//Main//--
 function PlayerAdded(Player)
-	local Player_Profile = ProfileService:New(Player)
-	Player_Profile.Signals.Loaded = function(...)
-		print(...)
-	end
-	Player_Profile.Signals.Corruption = function()
-		print("Detected corruption!")
-	end
-	Player_Profile.Signals.ListenToRelease:Once(function()
-		Profiles[Player] = nil
-		print("Replicated release!")
-	end)
-	local Player_Data = ProfileService.LoadData(Player)
-	if Player_Data then
-		print(Player_Data)
-		Player_Profile.Data = Player_Data
+	if not ProfileService.ReturnProfile(Player) then
+		local Player_Profile = ProfileService:New(Player)
+		Player_Profile.Signals.Loaded:Once(function(...)
+			print(...)
+		end)
+		Player_Profile.Signals.Corruption:Once(function()
+			print("Detected corruption!")
+		end)
+		Player_Profile.Signals.ListenToPurge:Once(function()
+			print("Purged!")
+		end)
+		Player_Profile.Signals.ListenToRelease:Once(function()
+			print("Replicated release!")
+		end)
+
+		local Player_Data = ProfileService.LoadData(Player)
+		if Player_Data then
+			print(Player_Data)
+			Player_Profile.Data = Player_Data
+
+		end
 		
 	end
-	Profiles[Player] = Player_Profile
+
 end
 function PlayerRemoved(Player)
 	local Player_Profile = Profiles[Player]
