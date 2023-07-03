@@ -1,6 +1,6 @@
 --//Services//--
 local Players = game:GetService("Players")
-local ProfileService = require(script.Parent.ProfileService)
+local ProfileService = require(12877376020)
 --//End of "Services"//--
 
 
@@ -12,7 +12,6 @@ local ProfileService = require(script.Parent.ProfileService)
 
 
 --//Arrays//--
-local Profiles = {}
 --//End of "Arrays"//--
 
 
@@ -25,38 +24,34 @@ local Profiles = {}
 
 --//Main//--
 function PlayerAdded(Player)
-	if not ProfileService.ReturnProfile(Player) then
-		local Player_Profile = ProfileService:New(Player)
-		Player_Profile.Signals.Loaded:Once(function(...)
-			print(...)
-		end)
-		Player_Profile.Signals.Corruption:Once(function()
-			print("Detected corruption!")
-		end)
-		Player_Profile.Signals.ListenToPurge:Once(function()
-			print("Purged!")
-		end)
-		Player_Profile.Signals.ListenToRelease:Once(function()
-			print("Replicated release!")
-		end)
+	if ProfileService.ReturnProfile(Player) then return end
+	local Player_Profile = ProfileService:New(Player)
 
-		local Player_Data = ProfileService.LoadData(Player)
-		if Player_Data then
-			print(Player_Data)
-			Player_Profile.Data = Player_Data
+	Player_Profile.Signals.Loaded:Once(function(...)
+		print(...)
+	end)
+	Player_Profile.Signals.Corruption:Once(function()
+		print("Detected corruption!")
+	end)
+	Player_Profile.Signals.ListenToPurge:Once(function()
+		print("Purged!")
+	end)
+	Player_Profile.Signals.ListenToRelease:Once(function()
+		print("Replicated release!")
+	end)
 
-		end
-		
-	end
+	local Player_Data = ProfileService.LoadData(Player)
+	if not Player_Data then return end 
+
+	Player_Profile.Data = Player_Data
 
 end
 function PlayerRemoved(Player)
-	local Player_Profile = Profiles[Player]
-	if Player_Profile then
-		Player_Profile:Release()
-		
-	end
+	local Player_Profile = ProfileService.ReturnProfile(Player)
+	if not Player_Profile then return end
 	
+	Player_Profile:Release()
+
 end
 --//End of "Main"//--
 
