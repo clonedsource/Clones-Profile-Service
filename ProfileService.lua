@@ -41,18 +41,13 @@ local ProfileBinds = {}
 
 
 --//Main Functions//--
-local function GetAsync(_DataStore: DataStore, ...) return _DataStore:GetAsync(...) end
-local function UpdateAsync(_DataStore: DataStore, UserId, New) return _DataStore:UpdateAsync(UserId, function(Old) if not New and settings.DebugMode then print("new data is not real!") end return New end) end
-local function SetAsync(_DataStore: DataStore, ...) return _DataStore:SetAsync(...) end
-local function RemoveAsync(_DataStore: DataStore, ...) return _DataStore:RemoveAsync(...) end
-
 local function AttemptCache()
 	for UserId, ProfileData in pairs(Cache) do
 		if ProfileData then
 			task.spawn(function() 
 				coroutine.wrap(function()
-					for _ = 0, 2 do -- Attempts to update Data.
-						local success = pcall(UpdateAsync, DataStore, UserId, ProfileData.Data)
+					for z = 0, 2 do -- Attempts to update Data.
+						local success = pcall(DataStore.UpdateAsync, DataStore, UserId, function(...) return ProfileData.Data or ... end)
 						if settings.DebugMode then
 							if not success then
 								print("Attempt failed!")
@@ -70,13 +65,13 @@ local function AttemptCache()
 							coroutine.yield()
 
 						end
-						task.wait(1.75^(_+3))
+						task.wait(1.75^(z+3))
 
 					end
 				end)()	
 				coroutine.wrap(function()
-					for _ = 0, 2 do -- Attempts to update backup Data.
-						local success = pcall(UpdateAsync, BackupStore, UserId, ProfileData.Data)
+					for z = 0, 2 do -- Attempts to update backup Data.
+						local success = pcall(BackupStore.UpdateAsync, BackupStore, UserId, function(...) return ProfileData.Data or ... end)
 						if settings.DebugMode then
 							if not success then
 								print("Attempt to backup failed!")
@@ -92,13 +87,13 @@ local function AttemptCache()
 							coroutine.yield()
 
 						end
-						task.wait(1.75^(_+3))
+						task.wait(1.75^(z+3))
 
 					end
 				end)()
 				coroutine.wrap(function()
-					for _ = 0, 2 do -- Attempts to update metadata.
-						local success = pcall(UpdateAsync, MetadataStore, UserId, ProfileData.Metadata)
+					for z = 0, 2 do -- Attempts to update metadata.
+						local success = pcall(MetadataStore.UpdateAsync, MetadataStore, UserId,  function(...) return ProfileData.Metadata or ... end)
 						if settings.DebugMode then
 							if not success then
 								print("Attempt to update metadata failed!")
@@ -114,7 +109,7 @@ local function AttemptCache()
 							coroutine.yield()
 
 						end
-						task.wait(1.75^(_+3))
+						task.wait(1.75^(z+3))
 
 					end
 				end)()
@@ -199,8 +194,8 @@ function Service:New(
 	task.spawn(function() -- Metadata is pretty important ngl, but I want the profile to return fast, so I'll just task it.
 		local LastLoadedTick = tick()
 		coroutine.wrap(function()
-			for _ = 0, 2 do
-				local success, metadata = pcall(GetAsync, MetadataStore, UserId)
+			for z = 0, 2 do
+				local success, metadata = pcall(MetadataStore.GetAsync, MetadataStore, UserId)
 				if success then
 					Profile.Metadata = Reconcile(metadata, TemplateMetadata)
 					coroutine.yield()
@@ -212,7 +207,7 @@ function Service:New(
 
 				end
 
-				task.wait(1.75^(_+3))
+				task.wait(1.75^(z+3))
 			end
 
 		end)()
@@ -256,13 +251,15 @@ function Service:New(
 			print(Profile.Metadata.LastVersion, settings.Version)
 			print(Profile.Metadata)
 		end
-
-		Cache[UserId] = {Data = Profile.Data, Metadata = Profile.Metadata}
-		pcall(UpdateAsync, DataStore, UserId, Profile.Data)
-
+		
 		ListenToRelease:Fire()
 		ProfileBinds[UserId] = nil
-
+		
+		local success = pcall(DataStore.UpdateAsync, DataStore, UserId, function(...) return Profile.Data or ... end)
+		if success then return end --// No need to cache already saved data, might cause overwrite errors if they're server hopping.
+		
+		Cache[UserId] = {Data = Profile.Data, Metadata = Profile.Metadata}
+		
 	end
 	Profiles[UserId] = Profile
 
@@ -331,9 +328,9 @@ function Service:Purge(
 	local successCount = 0
 
 	if UserId then
-		local function Remover(...)
-			for _ = 0, 2 do
-				local success = table.pack(pcall(task.spawn, RemoveAsync, ...))
+		local function Remover(Store, UserId)
+			for z = 0, 2 do
+				local success = table.pack(pcall(task.spawn, Store.RemoveAsync, Store, UserId))
 				if success then
 					successCount += 1
 					coroutine.yield()
@@ -345,7 +342,7 @@ function Service:Purge(
 					end
 
 				end
-				task.wait(1.75^(_+3))
+				task.wait(1.75^(z+3))
 
 			end
 			coroutine.yield()
@@ -355,7 +352,7 @@ function Service:Purge(
 		coroutine.wrap(Remover)(BackupStore, UserId)
 		if Profiles[UserId] then
 			Profiles[UserId].Metadata.Purged = true
-			pcall(task.spawn, UpdateAsync, MetadataStore, UserId, Reconcile(Profiles[UserId].Metadata, TemplateMetadata))
+			pcall(task.spawn, MetadataStore.UpdateAsync, MetadataStore, UserId, function(...) return Reconcile(Profiles[UserId].Metadata, TemplateMetadata) or ... end)
 			if ProfileBinds[UserId] then
 				ProfileBinds[UserId].ListenToPurge:Fire()
 
@@ -407,8 +404,8 @@ function Service.LoadData(
 		end
 
 		if not Data then -- Validation of data given a failure in pulling.
-			for _ = 0, 2 do -- Attempts to pull from datastore
-				local success, result = pcall(GetAsync, DataStore, UserId)
+			for z = 0, 2 do -- Attempts to pull from datastore
+				local success, result = pcall(DataStore.GetAsync, DataStore, UserId)
 				if not success and settings.DebugMode then
 					warn(result)
 					if ProfileBinds[UserId] then
@@ -424,7 +421,7 @@ function Service.LoadData(
 					pullSuccess = success
 					break
 				end
-				task.wait(1.75^(_+3))
+				task.wait(1.75^(z+3))
 
 			end
 
@@ -438,8 +435,8 @@ function Service.LoadData(
 				local last_pullSuccess = pullSuccess
 				pullSuccess = false
 
-				for _ = 0, 2 do -- Attempts to pull from backup datastore
-					local success, result = pcall(GetAsync, BackupStore, UserId)
+				for z = 0, 2 do -- Attempts to pull from backup datastore
+					local success, result = pcall(BackupStore.GetAsync, BackupStore, UserId)
 					if not success and settings.DebugMode then
 						print(result)
 
@@ -453,7 +450,7 @@ function Service.LoadData(
 						break
 
 					end
-					task.wait(1.75^(_+3))
+					task.wait(1.75^(z+3))
 
 				end
 
@@ -492,8 +489,8 @@ function Service.LoadData(
 
 			end
 
-			for _ = 0, 2 do -- Attempts to pull from old datastore
-				local success, result = pcall(GetAsync, DataStoreService:GetDataStore(StoreName), UserId)
+			for z = 0, 2 do -- Attempts to pull from old datastore
+				local success, result = pcall(DataStoreService:GetDataStore(StoreName).GetAsync, DataStoreService:GetDataStore(StoreName), UserId)
 				if not success and settings.DebugMode then
 					warn(result)
 					if ProfileBinds[UserId] then
@@ -509,7 +506,7 @@ function Service.LoadData(
 					pullSuccess = success
 					break
 				end
-				task.wait(1.75^(_+3))
+				task.wait(1.75^(z+3))
 
 			end
 
@@ -526,8 +523,8 @@ function Service.LoadData(
 				local last_pullSuccess = pullSuccess
 				pullSuccess = false
 
-				for _ = 0, 2 do -- Attempts to pull from old backup datastore
-					local success, result = pcall(GetAsync, DataStoreService:GetDataStore(StoreName), UserId)
+				for z = 0, 2 do -- Attempts to pull from old backup datastore
+					local success, result = pcall(DataStoreService:GetDataStore(StoreName).GetAsync, DataStoreService:GetDataStore(StoreName), UserId)
 					if not success and settings.DebugMode then
 						warn(result)
 						ProfileBinds[UserId].ListenToDebug:Fire(result, "warn")
@@ -541,7 +538,7 @@ function Service.LoadData(
 						break
 
 					end
-					task.wait(1.75^(_+3))
+					task.wait(1.75^(z+3))
 
 				end
 
