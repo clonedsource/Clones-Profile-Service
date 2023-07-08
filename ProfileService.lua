@@ -256,7 +256,6 @@ function Service:New(
 		ProfileBinds[UserId] = nil
 		
 		local success = pcall(DataStore.UpdateAsync, DataStore, UserId, function(...) return Profile.Data or ... end)
-		if success then return end --// No need to cache already saved data, might cause overwrite errors if they're server hopping.
 		
 		Cache[UserId] = {Data = Profile.Data, Metadata = Profile.Metadata}
 		
