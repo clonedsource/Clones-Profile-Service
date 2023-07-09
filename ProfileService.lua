@@ -123,8 +123,18 @@ local function AttemptCache()
 end
 
 local function CacheMain()
+	if settings.DebugMode then print("Caching main is running!") end;
+
 	while task.wait(Frequency) do
 		gcinfo()
+		for UserId, Profile in pairs(ProfileBinds) do
+			if Profile then
+				if settings.DebugMode then print(UserId, Profile) end;
+				Cache[UserId] = {Data = Profile.Data, Metadata = Profile.Metadata}
+
+			end
+
+		end
 		if settings.DebugMode then
 			print("Caching, next tick: " .. tick() + Frequency)
 
@@ -251,14 +261,14 @@ function Service:New(
 			print(Profile.Metadata.LastVersion, settings.Version)
 			print(Profile.Metadata)
 		end
-		
+
 		ListenToRelease:Fire()
 		ProfileBinds[UserId] = nil
-		
+
 		local success = pcall(DataStore.UpdateAsync, DataStore, UserId, function(...) return Profile.Data or ... end)
-		
+
 		Cache[UserId] = {Data = Profile.Data, Metadata = Profile.Metadata}
-		
+
 	end
 	Profiles[UserId] = Profile
 
