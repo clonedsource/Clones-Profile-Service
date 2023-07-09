@@ -172,7 +172,7 @@ function Service:Initialize(
 	if settings.DebugMode then
 		print(settings)
 	end
-
+	task.spawn(CacheMain) -- HOW DID I FORGET TO ADD THIS???
 end
 
 function Service:New(
